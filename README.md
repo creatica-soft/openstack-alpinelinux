@@ -21,7 +21,7 @@ The proof of concept is done though. All control plane openstack components run 
 - compute nodes
 - sample alpine-based VM with all dependent openstack objects 
 
-The openstack components and its prerequisites (except ovn and python openstack client, which are installed on each controller node) are built in linux containers based on alpine-3.xx (default) distributions. Ubuntu containers were initially used but their automation is no longer maintained, except for mariadb galera cluster.
+The openstack components and its prerequisites (except ovn and python openstack client, which are installed on each controller node) are built in linux containers based on alpine-3.xx (default) distributions. Ubuntu containers are used for mariadb galera cluster. Default database cluster is postgresql which runs in alpine container.
 
 Linux containers rely on ceph cluster as a backing storage and connect to OVN network cluster.
 
