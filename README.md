@@ -1,4 +1,4 @@
-# Openstack production installation scripts
+# Openstack installation scripts
 
 This is work in progress. 
 
