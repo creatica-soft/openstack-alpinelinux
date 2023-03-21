@@ -78,12 +78,12 @@ first. Then clone this repo (use .ssh/git_id_rsa for ssh key if you want)
 
 ```
 vi .ssh/config
-Host git.corp-apps.com
- HostName git.corp-apps.com
+Host github.com
+ HostName github.com
  IdentityFile ~/.ssh/git_id_rsa
 
-git clone ssh://git@git.corp-apps.com:7999/ea/openstack-prod-install.git
-cd openstack-prod-install
+git clone https://github.com/creatica-soft/openstack-alpinelinux
+cd openstack-alpinelinux
 chmod 755 *.sh */*.sh */*/*.sh
 ```
 
