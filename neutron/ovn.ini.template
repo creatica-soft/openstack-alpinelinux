@@ -1,0 +1,10 @@
+[DEFAULT]
+[ovn]
+ovn_nb_connection = ${OVN_NB_DB}
+ovn_sb_connection = ${OVN_SB_DB}
+ovn_l3_scheduler = leastloaded
+enable_distributed_floating_ip = true
+ovn_metadata_enabled = true
+dns_servers = ${DNS_SERVERS}
+neutron_sync_mode = off
+[ovs]

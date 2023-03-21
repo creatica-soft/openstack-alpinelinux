@@ -1,0 +1,54 @@
+global_defs {
+   notification_email {
+     ${KEEPALIVED_NOTIFICATION_EMAIL}
+   }
+   notification_email_from ${KEEPALIVED_EMAIL_FROM}
+   smtp_server ${KEEPALIVED_SMTP_SERVER}
+   smtp_connect_timeout 30
+   vrrp_skip_check_adv_addr
+   script_user root root
+   enable_script_security
+   vrrp_check_unicast_src
+   max_auto_priority -1
+}
+
+vrrp_script chk_haproxy {
+    script "/usr/bin/pkill -0 haproxy"
+    user root root
+    interval 10
+    weight -20
+}
+
+vrrp_instance VI_1 {
+    @${CONTAINER_NAME}-1 state MASTER
+    @${CONTAINER_NAME}-2 state BACKUP
+    @${CONTAINER_NAME}-3 state BACKUP
+    interface ${KEEPALIVED_IFACE}
+    virtual_router_id 51
+    @${CONTAINER_NAME}-1 priority 100
+    @${CONTAINER_NAME}-2 priority 95
+    @${CONTAINER_NAME}-3 priority 90
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass ${KEEPALIVED_AUTH_PASS}
+    }
+    virtual_ipaddress {
+        ${HAPROXY_IP}
+    }
+!   use unicast adverts instead of multicast
+    unicast_peer {
+        @${CONTAINER_NAME}-3 ${IP_ADDR1}
+        @${CONTAINER_NAME}-3 ${IP_ADDR2}
+        @${CONTAINER_NAME}-2 ${IP_ADDR1}
+        @${CONTAINER_NAME}-2 ${IP_ADDR3}
+        @${CONTAINER_NAME}-1 ${IP_ADDR2}
+        @${CONTAINER_NAME}-1 ${IP_ADDR3}
+    }
+    track_script {
+        chk_haproxy
+    }
+    notify_master "/sbin/service haproxy start" root root
+    notify_backup "/sbin/service haproxy stop" root root
+!    smtp_alert true
+}

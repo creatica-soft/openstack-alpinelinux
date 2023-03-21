@@ -1,0 +1,2 @@
+[client.admin]
+        key = ${CEPH_ADMIN_KEY}

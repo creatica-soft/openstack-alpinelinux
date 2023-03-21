@@ -1,0 +1,12 @@
+/var/log/cinder/cinder-volume.* {
+    rotate 7
+    daily
+    nocreate
+    missingok
+    ifempty
+    compress
+    sharedscripts
+    postrotate
+        service cinder-volume restart
+    endscript
+}

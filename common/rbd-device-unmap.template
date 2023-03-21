@@ -1,0 +1,3 @@
+#!/usr/bin/bash
+
+rbd -c ${CEPH_CONF} -k ${CEPH_CLIENT_KEYRING} device unmap --pool ${RBD_POOL} ${LXC_NAME} --id ${CEPH_CLIENT} 2>&1

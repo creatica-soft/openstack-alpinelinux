@@ -1,0 +1,9 @@
+[global]
+  fsid = ${CEPH_CLUSTER_ID}
+  mon_host = [v2:${CEPH_NODE_IP1}:3300/0,v1:${CEPH_NODE_IP1}:6789/0] [v2:${CEPH_NODE_IP2}:3300/0,v1:${CEPH_NODE_IP2}:6789/0] [v2:${CEPH_NODE_IP3}:3300/0,v1:${CEPH_NODE_IP3}:6789/0]
+[client]
+  rbd cache = true
+  rbd cache writethrough until flush = true
+  admin socket = /var/run/ceph/guests/$cluster-$type.$id.$pid.$cctid.asok
+  log file = /var/log/qemu/qemu-guest-$pid.log
+  rbd concurrent management ops = 20

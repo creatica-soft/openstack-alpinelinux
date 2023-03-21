@@ -1,0 +1,2 @@
+[client.${CEPH_CLIENT}]
+        key = ${CEPH_CLIENT_KEY}

@@ -1,0 +1,4 @@
+search ${DOMAIN_NAME}
+nameserver ${CONTROLLER_IP1}
+nameserver ${CONTROLLER_IP2}
+nameserver ${CONTROLLER_IP3}

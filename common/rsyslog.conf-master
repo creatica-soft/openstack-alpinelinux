@@ -1,0 +1,53 @@
+$WorkDirectory /var/lib/rsyslog
+$FileOwner root
+$FileGroup adm
+$FileCreateMode 0640
+$DirCreateMode 0755
+$Umask 0022
+global(
+  net.ipprotocol="ipv4-only"
+)
+main_queue(queue.minDequeueBatchSize="1" queue.minDequeueBatchSize.timeout="1000")
+module(load="immark")
+module(load="imklog")
+module(load="imuxsock")
+module(load="imptcp")
+input(
+  type="imptcp"
+  port="10514"
+)
+
+kern.*                                                  /var/log/kern.log
+
+# Memcached, Haproxy, Keepalived, Horizon logs, etc
+daemon.*                                                /var/log/messages
+
+# OVS/OVN logging
+local0.*                                                /var/log/ovs-ovn.log
+
+# RabbitMQ logging does not work via syslog
+#local1.*                                                /var/log/rabbitmq.log
+
+# Keepalived allows only LOCAL0..LOCAL7
+local1.*                                                /var/log/keepalived.log
+
+# Postgresql logging
+local2.*                                                /var/log/postgres.log
+
+# Keystone logging
+local3.*                                                /var/log/keystone.log
+
+# Glance logging
+local4.*                                                /var/log/glance.log
+
+# Placement logging
+user.*                                                  /var/log/placement.log
+
+# Nova logging
+local5.*                                                /var/log/nova.log
+
+# Neutron logging
+local6.*                                                /var/log/neutron.log
+
+# Cinder logging
+local7.*                                                /var/log/cinder.log

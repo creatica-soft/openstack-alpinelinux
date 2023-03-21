@@ -1,0 +1,14 @@
+/var/log/*.log
+/var/log/messages
+{
+        rotate 7
+        daily
+        nocreate
+        missingok
+        ifempty
+        compress
+        sharedscripts
+        postrotate
+                /etc/init.d/rsyslog --ifstarted reload >/dev/null
+        endscript
+}

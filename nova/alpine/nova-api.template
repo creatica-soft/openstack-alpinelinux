@@ -1,0 +1,22 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="Nova API compute openstack service"
+command="/bin/nova-api-wsgi"
+command_args="--host 0.0.0.0 --port ${PORT}"
+command_user="nova:nova"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+#supervise_daemon_args="--stdout /var/log/nova/nova-api-${i}.out --stderr /var/log/nova/nova-api-${i}.err"
+directory=/var/lib/nova
+required_files=/etc/nova/nova.conf
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+#output_logger="/usr/bin/logger"
+#error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}

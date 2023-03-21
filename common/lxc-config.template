@@ -1,0 +1,21 @@
+lxc.include = /usr/share/lxc/config/common.conf
+#lxc.rootfs.managed = 0
+lxc.mount.entry = /sys/kernel/debug sys/kernel/debug none bind,optional 0 0
+lxc.mount.entry = /sys/kernel/security sys/kernel/security none bind,optional 0 0
+lxc.mount.entry = /sys/fs/pstore sys/fs/pstore none bind,optional 0 0
+lxc.mount.entry = mqueue dev/mqueue mqueue rw,relatime,create=dir,optional 0 0
+lxc.arch = linux64
+lxc.net.0.type = veth
+lxc.hook.version = 1
+lxc.net.0.script.up = /etc/lxc/ovs_up_down
+lxc.net.0.script.down = /etc/lxc/ovs_up_down
+lxc.net.0.flags = up
+lxc.net.0.veth.pair = ${PORT_NAME}
+lxc.net.0.hwaddr = ${MAC_ADDR}
+lxc.net.0.mtu = 1442
+lxc.rootfs.path = rbd:/dev/rbd/${RBD_POOL}/${UTS_NAME}
+lxc.uts.name = ${UTS_NAME}
+lxc.start.auto = 1
+lxc.start.delay = 3
+lxc.start.order = 1
+lxc.group = onboot

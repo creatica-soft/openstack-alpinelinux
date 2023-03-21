@@ -1,0 +1,42 @@
+[DEFAULT]
+rootwrap_config = /etc/cinder/rootwrap.conf
+api_paste_confg = /etc/cinder/api-paste.ini
+iscsi_helper = tgtadm
+volume_name_template = volume-%s
+volume_group = cinder-volumes
+verbose = True
+#auth_strategy = keystone
+state_path = /var/lib/cinder
+lock_path = /var/lock/cinder
+volumes_dir = /var/lib/cinder/volumes
+enabled_backends = ceph
+glance_api_version = 2
+transport_url = rabbit://openstack:${RABBITMQ_PASS}@${RABBITMQ_CONTAINER_NAME}-1:5672,openstack:${RABBITMQ_PASS}@${RABBITMQ_CONTAINER_NAME}-2:5672,openstack:${RABBITMQ_PASS}@${RABBITMQ_CONTAINER_NAME}-3:5672/
+#my_ip = ${COMPUTE_NODE_IP_ADDR}
+[database]
+connection = ${SQL_DIALECT}+${SQL_DRIVER}://${CONTAINER_NAME}:${CINDER_DBPASS}@${SQL_CONTAINER_NAME}/${CONTAINER_NAME}
+${SLAVE_CONNECTION} = ${SQL_DIALECT}+${SQL_DRIVER}://${CONTAINER_NAME}:${CINDER_DBPASS}@${HAPROXY_CONTAINER_NAME}/${CONTAINER_NAME}
+[keystone_authtoken]
+www_authenticate_uri = http://${OS_PUBLIC_ENDPOINT}:5000/
+auth_url = http://${OS_INTERNAL_ENDPOINT}:5000/
+memcached_servers = ${MEMCACHED_CONTAINER_NAME}-1:11211,${MEMCACHED_CONTAINER_NAME}-2:11211,${MEMCACHED_CONTAINER_NAME}-3:11211
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+project_name = service
+username = cinder
+password = ${CINDER_DBPASS}
+service_token_roles_required = true
+[oslo_concurrency]
+lock_path = /var/lib/cinder/tmp
+[ceph]
+volume_driver = cinder.volume.drivers.rbd.RBDDriver
+volume_backend_name = ceph
+rbd_pool = ${CEPH_CINDER_POOL}
+rbd_ceph_conf = ${CEPH_CONF}
+rbd_flatten_volume_from_snapshot = false
+rbd_max_clone_depth = 5
+rbd_store_chunk_size = 4
+rados_connect_timeout = -1
+rbd_user = ${CEPH_CINDER_LOGIN}
+rbd_secret_uuid = ${CEPH_SECRET_CINDER_UUID}

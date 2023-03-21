@@ -1,0 +1,21 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="Neutron OVN metadata agent"
+command="/bin/neutron-ovn-metadata-agent"
+command_args="--config-file=/etc/neutron/neutron.conf --config-file=/etc/neutron/neutron_ovn_metadata_agent.ini --log-file=/var/log/neutron/neutron-ovn-metadata-agent.log"
+command_user="root:root"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+supervise_daemon_args="--stdout /var/log/neutron/neutron-ovn-metadata-agent.out --stderr /var/log/neutron/neutron-ovn-metadata-agent.err"
+required_files="/etc/neutron/neutron.conf /etc/neutron/neutron_ovn_metadata_agent.ini"
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+output_logger="/usr/bin/logger"
+error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}

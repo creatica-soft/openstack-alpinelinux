@@ -1,0 +1,20 @@
+global
+  master-worker
+  log /dev/log daemon
+  tune.ssl.default-dh-param 2048
+defaults
+  mode http
+  log global
+  timeout connect 5000ms
+  timeout server 180000ms
+  timeout client 180000ms
+  balance source
+resolvers mydns
+  parse-resolv-conf
+listen postgres # postgres
+  bind :5432 # postgres
+  mode tcp # postgres
+  option tcpka # postgres
+  server postgres-1 ${SQL_CONTAINER_IP1}:5432 # check weight 1 # postgres
+  server postgres-2 ${SQL_CONTAINER_IP2}:5432 # check weight 1 # postgres
+  server postgres-3 ${SQL_CONTAINER_IP3}:5432 # check weight 1 # postgres

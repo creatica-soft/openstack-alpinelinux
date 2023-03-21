@@ -1,0 +1,121 @@
+[DEFAULT]
+use_syslog = true
+syslog_log_facility = LOG_LOCAL5
+#default_log_levels = amqp=WARN,amqplib=WARN,boto=WARN,qpid=WARN,sqlalchemy=WARN,suds=INFO,oslo.messaging=INFO,oslo_messaging=INFO,iso8601=WARN,requests.packages.urllib3.connectionpool=WARN,urllib3.connectionpool=WARN,websocket=WARN,requests.packages.urllib3.util.retry=WARN,urllib3.util.retry=WARN,keystonemiddleware=WARN,routes.middleware=WARN,stevedore=WARN,taskflow=WARN,keystoneauth=WARN,oslo.cache=INFO,oslo_policy=INFO,dogpile.core.dogpile=INFO
+#rate_limit_interval = 0
+#rate_limit_burst = 0
+#rate_limit_except_level = ERROR
+lock_path = /var/lock/nova
+state_path = /var/lib/nova
+transport_url = rabbit://openstack:${RABBITMQ_PASS}@${RABBITMQ_CONTAINER_NAME}-1:5672,openstack:${RABBITMQ_PASS}@${RABBITMQ_CONTAINER_NAME}-2:5672,openstack:${RABBITMQ_PASS}@${RABBITMQ_CONTAINER_NAME}-3:5672/
+my_ip = ${IP_ADDR}
+#preallocate_images = space
+[api]
+[api_database]
+connection = ${SQL_DIALECT}+${SQL_DRIVER}://${CONTAINER_NAME}:${NOVA_DBPASS}@${SQL_CONTAINER_NAME}/nova_api
+${SLAVE_CONNECTION} = ${SQL_DIALECT}+${SQL_DRIVER}://${CONTAINER_NAME}:${NOVA_DBPASS}@${HAPROXY_CONTAINER_NAME}/nova_api
+[barbican]
+[cache]
+#memcached_servers = ${MEMCACHED_CONTAINER_NAME}-1:11211,${MEMCACHED_CONTAINER_NAME}-2:11211,${MEMCACHED_CONTAINER_NAME}-3:11211
+#memcache_pool_flush_on_reconnect = true
+[cinder]
+os_region_name = ${REGION}
+[compute]
+[conductor]
+[console]
+[consoleauth]
+[cors]
+[cyborg]
+[database]
+connection = ${SQL_DIALECT}+${SQL_DRIVER}://${CONTAINER_NAME}:${NOVA_DBPASS}@${SQL_CONTAINER_NAME}/${CONTAINER_NAME}
+${SLAVE_CONNECTION} = ${SQL_DIALECT}+${SQL_DRIVER}://${CONTAINER_NAME}:${NOVA_DBPASS}@${HAPROXY_CONTAINER_NAME}/${CONTAINER_NAME}
+[devices]
+[ephemeral_storage_encryption]
+[filter_scheduler]
+[glance]
+#api_servers = http://${OS_INTERNAL_ENDPOINT}:9292
+#rbd_ceph_conf = /etc/ceph/ceph.conf
+[guestfs]
+[healthcheck]
+[hyperv]
+[image_cache]
+[ironic]
+[key_manager]
+[keystone]
+[keystone_authtoken]
+www_authenticate_uri = http://${OS_PUBLIC_ENDPOINT}:5000/
+auth_url = http://${OS_INTERNAL_ENDPOINT}:5000/
+memcached_servers = ${MEMCACHED_CONTAINER_NAME}-1:11211,${MEMCACHED_CONTAINER_NAME}-2:11211,${MEMCACHED_CONTAINER_NAME}-3:11211
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+project_name = service
+username = nova
+password = ${NOVA_DBPASS}
+# service_token_roles_required should be set to true but nova's neutron client (v2.0) does not yet support service tokens, 
+# so it won't work if set to true
+#service_token_roles_required = true
+[libvirt]
+virt_type = ${LIBVIRT_TYPE}
+[metrics]
+[mks]
+[neutron]
+auth_url = http://${OS_INTERNAL_ENDPOINT}:5000
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+region_name = ${REGION}
+project_name = service
+username = neutron
+password = ${NEUTRON_DBPASS}
+service_metadata_proxy = true
+metadata_proxy_shared_secret = ${METADATA_PROXY_PASS}
+[notifications]
+[oslo_concurrency]
+lock_path = /var/lib/nova/tmp
+[oslo_messaging_amqp]
+[oslo_messaging_kafka]
+[oslo_messaging_notifications]
+[oslo_messaging_rabbit]
+[oslo_middleware]
+[oslo_policy]
+[pci]
+[placement]
+auth_url = http://${OS_INTERNAL_ENDPOINT}:5000/v3
+region_name = ${REGION}
+project_domain_name = Default
+project_name = service
+auth_type = password
+user_domain_name = Default
+username = placement
+password = ${PLACEMENT_DBPASS}
+[powervm]
+[privsep]
+[profiler]
+[quota]
+[rdp]
+[remote_debug]
+[scheduler]
+discover_hosts_in_cells_interval = 300
+[serial_console]
+[service_user]
+send_service_user_token = true
+auth_url = http://${OS_INTERNAL_ENDPOINT}:5000/
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+project_name = service
+username = nova
+password = ${NOVA_DBPASS}
+[spice]
+[upgrade_levels]
+[vault]
+[vendordata_dynamic_auth]
+[vmware]
+[vnc]
+enabled = true
+server_listen = ${IP_ADDR}
+server_proxyclient_address = ${IP_ADDR}
+[workarounds]
+[wsgi]
+[zvm]

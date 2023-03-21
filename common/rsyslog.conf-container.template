@@ -1,0 +1,23 @@
+$WorkDirectory /var/lib/rsyslog
+$FileOwner root
+$FileGroup adm
+$FileCreateMode 0640
+$DirCreateMode 0755
+$Umask 0022
+global(
+  net.ipprotocol="ipv4-only"
+)
+main_queue(queue.minDequeueBatchSize="1" queue.minDequeueBatchSize.timeout="1000")
+module(load="immark")
+module(load="imuxsock")
+input(
+        type="imuxsock"
+        ruleset="forwarding"
+        socket="/dev/log"
+)
+ruleset(name="forwarding" queue.type="linkedList" queue.filename="fwdq" queue.maxDiskSpace="256m" queue.saveOnShutdown="on" queue.minDequeueBatchSize="1" queue.minDequeueBatchSize.timeout="1000") {
+     action(type="omfwd" target="${CONTROLLER_NAME}-1" port="10514" protocol="tcp")
+     action(type="omfwd" target="${CONTROLLER_NAME}-2" port="10514" protocol="tcp" action.execOnlyWhenPreviousIsSuspended="on")
+     action(type="omfwd" target="${CONTROLLER_NAME}-3" port="10514" protocol="tcp" action.execOnlyWhenPreviousIsSuspended="on")
+     action(type="omfile" tag="failover" file="/var/log/messages" action.execOnlyWhenPreviousIsSuspended="on")
+}

@@ -1,0 +1,53 @@
+acl os-clients {
+                127.0.0.1/32;
+                ${INTERNAL_NETWORK_CIDR};
+                ${COMPUTE_NETWORK_CIDR};
+        };
+
+options {
+        directory "/var/bind";
+        allow-recursion { os-clients; };
+        forwarders {
+              ${DNS_FORWARDER1};
+              ${DNS_FORWARDER2};
+        };
+        listen-on { 127.0.0.1; ${CONTROLLER_IPADDR}; };
+        listen-on-v6 { none; };
+        pid-file "/var/run/named/named.pid";
+        dnssec-policy none;
+        dnssec-validation auto;
+};
+zone "." {
+        type hint;
+        file "named.ca";
+};
+zone "localhost" {
+        type master;
+        file "pri/localhost.zone";
+        allow-update { none; };
+        notify no;
+};
+zone "127.in-addr.arpa" {
+        type master;
+        file "pri/127.zone";
+        allow-update { none; };
+        notify no;
+};
+zone "${DOMAIN_NAME}" {
+        type slave;
+        file "sec/compute.zone";
+        allow-query { os-clients; };
+        masters { ${CONTROLLER_IP1}; };
+};
+zone "${INTERNAL_NETWORK_REVERSE}" {
+        type slave;
+        file "sec/internal-reverse.zone";
+        allow-query { os-clients; };
+        masters { ${CONTROLLER_IP1}; };
+};
+zone "${COMPUTE_NETWORK_REVERSE}" {
+        type slave;
+        file "sec/compute-reverse.zone";
+        allow-query { os-clients; };
+        masters { ${CONTROLLER_IP1}; };
+};

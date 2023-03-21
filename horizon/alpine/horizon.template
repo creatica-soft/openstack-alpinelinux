@@ -1,0 +1,22 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="Horizon openstack dashboard"
+command="/var/lib/openstack-dashboard/openstack_dashboard/wsgi.py"
+command_args="--host 0.0.0.0 --port ${PORT}"
+command_user="horizon:horizon"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+#supervise_daemon_args="--stdout /var/log/horizon/horizon-${i}.out --stderr /var/log/horizon/horizon-${i}.err"
+directory=/var/lib/openstack-dashboard
+required_files=/var/lib/openstack-dashboard/openstack_dashboard/local/local_settings.py
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+#output_logger="/usr/bin/logger"
+#error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}

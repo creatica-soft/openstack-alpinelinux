@@ -1,0 +1,6 @@
+network:
+    ethernets:
+        eth0:
+            routes:
+            - to: ${COMPUTE_NETWORK_CIDR}
+              via: ${INTERNAL_NETWORK_GATEWAY}

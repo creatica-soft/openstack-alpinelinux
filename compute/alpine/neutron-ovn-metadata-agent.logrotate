@@ -1,0 +1,12 @@
+/var/log/neutron/neutron-ovn-metadata-agent.* {
+    rotate 7
+    daily
+    nocreate
+    missingok
+    ifempty
+    compress
+    sharedscripts
+    postrotate
+        service neutron-ovn-metadata-agent restart
+    endscript
+}

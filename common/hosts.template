@@ -1,0 +1,2 @@
+${IP_ADDR} ${NAME}.${DOMAIN} ${NAME}
+127.0.0.1 localhost

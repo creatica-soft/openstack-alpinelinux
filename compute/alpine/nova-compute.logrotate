@@ -1,0 +1,12 @@
+/var/log/nova/nova-compute.* {
+    rotate 7
+    daily
+    nocreate
+    missingok
+    ifempty
+    compress
+    sharedscripts
+    postrotate
+        service nova-compute restart
+    endscript
+}

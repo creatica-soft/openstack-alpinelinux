@@ -1,0 +1,22 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="Keystone authentication and catalog openstack service"
+command="/bin/keystone-wsgi-public"
+command_args="--host 0.0.0.0 --port ${PORT}"
+command_user="keystone:keystone"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+#supervise_daemon_args="--stdout /var/log/keystone/keystone-${i}.out --stderr /var/log/keystone/keystone-${i}.err"
+directory=/var/lib/keystone
+required_files=/etc/keystone/keystone.conf
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+#output_logger="/usr/bin/logger"
+#error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}

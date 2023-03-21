@@ -1,0 +1,22 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="Cinder volume"
+command="/bin/cinder-volume"
+command_args="--config-file=/etc/cinder/cinder.conf --log-file=/var/log/cinder/cinder-volume.log"
+command_user="cinder:cinder"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+supervise_daemon_args="--stdout /var/log/cinder/cinder-volume.out --stderr /var/log/cinder/cinder-volume.err"
+required_files="/etc/cinder/cinder.conf"
+directory=/var/lib/cinder
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+output_logger="/usr/bin/logger"
+error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}

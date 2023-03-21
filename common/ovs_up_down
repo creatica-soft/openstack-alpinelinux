@@ -1,0 +1,10 @@
+#!/bin/bash
+BRIDGE="br-int"
+case "${LXC_HOOK_TYPE}" in
+"up")
+  ovs-vsctl --may-exist add-port ${BRIDGE} ${LXC_NET_PEER} -- --if-exists set interface ${LXC_NET_PEER} external_ids:iface-id="${LXC_NET_PEER}" external_ids:iface-status=active external_ids:vm-id="${LXC_NET_PEER}" 2>&1
+;;
+"down")
+  ovs-vsctl --if-exists del-port ${BRIDGE} ${LXC_NET_PEER} 2>&1
+;;
+esac

@@ -1,0 +1,485 @@
+#!/usr/bin/bash
+
+# Some common functions
+
+# lxc_snapshot creates a protected snapshot of a linux container ready to be cloned by lxc_clone
+# usage: lxc_snaphost <CONTAINER_NAME>
+function lxc_snapshot {
+  local CONTAINER_NAME=$1
+  if [[ -n "${CONTAINER_NAME}" ]]; then
+    local RBD="rbd -c ${CEPH_CONF} -k ${CEPH_CLIENT_KEYRING} --id ${CEPH_CLIENT} -p ${RBD_POOL}"
+
+    echo "${RBD} snap create --snap ${CONTAINER_NAME} ${CONTAINER_NAME}" 2>&1 | tee -a $0.log
+    ${RBD} snap create --snap ${CONTAINER_NAME} ${CONTAINER_NAME} 2>&1 | tee -a $0.log
+    
+    echo "${RBD} snap protect --snap ${CONTAINER_NAME} --image ${CONTAINER_NAME}" 2>&1 | tee -a $0.log
+    ${RBD} snap protect --snap ${CONTAINER_NAME} --image ${CONTAINER_NAME} 2>&1 | tee -a $0.log
+  
+  else
+    echo 'lxc_snapshot usage: lxc_snapshot <CONTAINER_NAME>' 2>&1 | tee -a $0.log
+  fi
+}
+
+# lxc_clone creates a new linux container from the original and maps rbd device on an invoking host or an ssh one
+# usage: lxc_clone <ORIG_NAME> <NEW_NAME> [SSH]
+function lxc_clone {
+  local ORIG_CONTAINER_NAME=$1
+  local NEW_CONTAINER_NAME=$2
+  local SSH=$3
+  if [[ -n "${ORIG_CONTAINER_NAME}" && -n "${NEW_CONTAINER_NAME}" ]]; then
+
+    local RBD="rbd -c ${CEPH_CONF} -k ${CEPH_CLIENT_KEYRING} --id ${CEPH_CLIENT}"
+
+    echo "local RBD_IMAGE=\`${RBD} --pool ${RBD_POOL} ls |grep -x ${ORIG_CONTAINER_NAME}\`" 2>&1 | tee -a $0.log
+    
+    local RBD_IMAGE=`${RBD} --pool ${RBD_POOL} ls |grep -x ${ORIG_CONTAINER_NAME}`
+
+    if [[ "${RBD_IMAGE}" != "${ORIG_CONTAINER_NAME}" ]]; then
+      echo "${ORIG_CONTAINER_NAME} image is not available." 2>&1 | tee -a $0.log
+      read -p "Would you like to create it? [y/N]"
+      if [[ "${REPLY}" != "y" ]]; then
+        echo "Sorry, cannot continue without the base image ${ORIG_CONTAINER_NAME}"  2>&1 | tee -a $0.log
+        exit 1;
+      fi
+      ${BASE_DIR}/common/create-base-image.sh
+    fi
+
+    local RBD_NEW_IMAGE=`${RBD} --pool ${RBD_POOL} ls |grep ${NEW_CONTAINER_NAME}`
+
+    if [[ "${RBD_NEW_IMAGE}" == "${NEW_CONTAINER_NAME}" ]]; then
+      read -p "The linux container image ${NEW_CONTAINER_NAME} already exists in the ceph cluster. Would you like to remove it along with all its clones? [y/N]"
+      if [[ "${REPLY}" == "y" ]]; then
+        local CONTAINER=`echo ${NEW_CONTAINER_NAME}|cut -f1 -d "-"`
+        ${BASE_DIR}/container-uninstall.sh ${CONTAINER}
+        if (( $? != 0 )); then
+          read -p "Some errors occured during uninstalling ${CONTAINER}, which may cause further issues. Continue? [y/N]"
+          if [[ "${REPLY}" != "y" ]]; then
+            exit 1
+          fi
+        fi
+      else
+        return
+      fi
+    fi
+
+    echo "${RBD} clone --pool ${RBD_POOL} --image ${ORIG_CONTAINER_NAME} --snap ${ORIG_CONTAINER_NAME} --dest-pool ${RBD_POOL} --dest ${NEW_CONTAINER_NAME}" 2>&1 | tee -a $0.log
+    
+    ${RBD} clone --pool ${RBD_POOL} --image ${ORIG_CONTAINER_NAME} --snap ${ORIG_CONTAINER_NAME} --dest-pool ${RBD_POOL} --dest ${NEW_CONTAINER_NAME} 2>&1 | tee -a $0.log
+
+  else
+    echo 'lxc_clone usage: lxc_clone <ORIG_CONTAINER_NAME> <NEW_CONTAINER_NAME> [SSH]' 2>&1 | tee -a $0.log
+  fi
+}
+
+# updates DNS records
+# Don't forget to run dns_reload!
+# usage: dns_update <name> [ip]
+function dns_update {
+  if [[ -z "${OVN_NB_DB}" ]]; then
+    echo 'OVN_NB_DB envvar is not set. Exiting dns_update...' 2>&1 | tee -a $0.log
+    exit 1
+  fi
+
+  local PORT_NAME=$1
+  local IP=$2
+  if [[ -n "${PORT_NAME}" ]]; then
+    echo "PORT_NAME=${PORT_NAME}" 2>&1 | tee -a $0.log
+    if [[ -z "${IP}" ]]; then
+      local IP=`ovn-nbctl find logical_switch_port name=${PORT_NAME} | egrep "^dynamic_addresses "|cut -f2- -d":"|cut -f3 -d" "|tr -d "\""`
+      echo "IP=${IP}" 2>&1 | tee -a $0.log
+    fi
+
+    while [[ -z "${IP}" ]]; do
+      read -p "IP is empty. Would you like to wait a bit and try to get it again? [Y/n]"
+      if [[ "${REPLY}" == "n" ]]; then
+        echo "Sorry, installation cannot be continued without the IP"
+        exit 1
+      fi
+      IP=`ovn-nbctl find logical_switch_port name=${PORT_NAME} | egrep "^dynamic_addresses "|cut -f2- -d":"|cut -f3 -d" "|tr -d "\""`
+    done
+
+    local A=`grep ^${PORT_NAME} /var/bind/pri/compute.zone`
+    echo "A=${A}" 2>&1 | tee -a $0.log
+    if [[ -n "${A}" ]]; then
+      echo "sed -i \"/^${PORT_NAME}/c\\${PORT_NAME}\ A\ ${IP}\" /var/bind/pri/compute.zone" 2>&1 | tee -a $0.log
+      sed -i "/^${PORT_NAME}/c\\${PORT_NAME}\ A\ ${IP}" /var/bind/pri/compute.zone 2>&1 | tee -a $0.log
+    else
+      echo "sed -i \"\$a\\${PORT_NAME}\ A\ ${IP}\" /var/bind/pri/compute.zone" 2>&1 | tee -a $0.log
+      sed -i "\$a\\${PORT_NAME}\ A\ ${IP}" /var/bind/pri/compute.zone 2>&1 | tee -a $0.log
+    fi
+    local PTR=`grep ${PORT_NAME} /var/bind/pri/internal-reverse.zone`
+    echo "PTR=${PTR}" 2>&1 | tee -a $0.log
+    IP=`echo ${IP}|cut -f4 -d"."`
+    echo "IP=${IP}" 2>&1 | tee -a $0.log
+    if [[ -n "${PTR}" ]]; then
+      echo "sed -i \"/${PORT_NAME}/c\\${IP}\ PTR\ ${PORT_NAME}.${DOMAIN_NAME}.\" /var/bind/pri/internal-reverse.zone" 2>&1 | tee -a $0.log
+      sed -i "/${PORT_NAME}/c\\${IP}\ PTR\ ${PORT_NAME}.${DOMAIN_NAME}." /var/bind/pri/internal-reverse.zone 2>&1 | tee -a $0.log
+    else
+      echo "sed -i \"\$a\\${IP}\ PTR\ ${PORT_NAME}.${DOMAIN_NAME}.\" /var/bind/pri/internal-reverse.zone" 2>&1 | tee -a $0.log
+      sed -i "\$a\\${IP}\ PTR\ ${PORT_NAME}.${DOMAIN_NAME}." /var/bind/pri/internal-reverse.zone 2>&1 | tee -a $0.log
+    fi
+  else
+    echo 'dns_update usage: dns_update <name> [ip]' 2>&1 | tee -a $0.log
+  fi    
+}
+
+# update zone's serial numbers and reload
+function dns_reload {
+  local DATE=`date -I|tr -d "-"`
+  DATE="${DATE}01"
+  echo "DATE=${DATE}" 2>&1 | tee -a $0.log
+  local SERIAL=`grep "; Serial" /var/bind/pri/compute.zone |tr -d " "|cut -f1 -d";"`
+  echo "SERIAL=${SERIAL}" 2>&1 | tee -a $0.log
+  if (( SERIAL >= DATE )); then
+     SERIAL=$(( SERIAL + 1 ))
+     echo "sed -i \"/;\ Serial/c\\ \ ${SERIAL}\ ;\ Serial\" /var/bind/pri/compute.zone" 2>&1 | tee -a $0.log
+     sed -i "/;\ Serial/c\\ \ ${SERIAL}\ ;\ Serial" /var/bind/pri/compute.zone 2>&1 | tee -a $0.log
+  else
+     echo "sed -i \"/;\ Serial/c\\ \ ${DATE}\ ;\ Serial\" /var/bind/pri/compute.zone" 2>&1 | tee -a $0.log
+     sed -i "/;\ Serial/c\\ \ ${DATE}\ ;\ Serial" /var/bind/pri/compute.zone 2>&1 | tee -a $0.log
+  fi
+  SERIAL=`grep "; Serial" /var/bind/pri/internal-reverse.zone |tr -d " "|cut -f1 -d";"`
+  echo "SERIAL=${SERIAL}" 2>&1 | tee -a $0.log
+  if (( SERIAL >= DATE )); then
+     SERIAL=$(( SERIAL + 1 ))
+     echo "sed -i \"/;\ Serial/c\\ \ ${SERIAL}\ ;\ Serial\" /var/bind/pri/internal-reverse.zone" 2>&1 | tee -a $0.log
+     sed -i "/;\ Serial/c\\ \ ${SERIAL}\ ;\ Serial" /var/bind/pri/internal-reverse.zone 2>&1 | tee -a $0.log
+  else
+     echo \"sed -i "/;\ Serial/c\\ \ ${DATE}\ ;\ Serial\" /var/bind/pri/internal-reverse.zone" 2>&1 | tee -a $0.log
+     sed -i "/;\ Serial/c\\ \ ${DATE}\ ;\ Serial" /var/bind/pri/internal-reverse.zone 2>&1 | tee -a $0.log
+  fi
+
+  echo "rndc reload" 2>&1 | tee -a $0.log
+  rndc reload 2>&1 | tee -a $0.log
+}
+
+# deletes forward and reverse DNS records
+# Don't forget to run dns_reload!
+# usage: dns_delete <name>
+function dns_delete {
+  local NAME=$1
+  echo "NAME=${NAME}" 2>&1 | tee -a $0.log
+  if [[ -n "${NAME}" ]]; then
+    echo "sed -i \"/^${NAME}/d\" /var/bind/pri/compute.zone" 2>&1 | tee -a $0.log
+    sed -i "/^${NAME}/d" /var/bind/pri/compute.zone 2>&1 | tee -a $0.log
+    echo "sed -i \"/${NAME}/d\" /var/bind/pri/internal-reverse.zone" 2>&1 | tee -a $0.log
+    sed -i "/${NAME}/d" /var/bind/pri/internal-reverse.zone 2>&1 | tee -a $0.log
+  else
+    echo 'dns_delete usage: dns_delete <name>'
+  fi
+}
+
+# ovn_nbctl_add_port adds a port to an OVN bridge to be bound on a specified chassis
+# and creates forward and reverse DNS records
+# usage: ovn_nbctl_add_port <bridge_name> <port_name> <chassis_name>
+function ovn_nbctl_add_port {
+  if [[ -z "${OVN_NB_DB}" ]]; then
+    echo 'OVN_NB_DB envvar is not set. Exiting ovn_nbctl_add_port...' 2>&1 | tee -a $0.log
+    exit 1
+  fi
+  local BRIDGE_NAME=$1
+  local PORT_NAME=$2
+  local CHASSIS_NAME=$3
+  if [[ -v BRIDGE_NAME && -v PORT_NAME && -v CHASSIS_NAME ]]; then
+    
+    echo "ovn-nbctl --may-exist lsp-add ${BRIDGE_NAME} ${PORT_NAME} -- lsp-set-addresses ${PORT_NAME} dynamic -- lsp-set-dhcpv4-options ${PORT_NAME} ${DHCP_OPTIONS} -- lsp-set-enabled ${PORT_NAME} enabled -- lsp-set-options ${PORT_NAME} requested-chassis=\"${CHASSIS_NAME}\"" 2>&1 | tee -a $0.log
+    
+    ovn-nbctl --may-exist lsp-add ${BRIDGE_NAME} ${PORT_NAME} -- lsp-set-addresses ${PORT_NAME} dynamic -- lsp-set-dhcpv4-options ${PORT_NAME} ${DHCP_OPTIONS} -- lsp-set-enabled ${PORT_NAME} enabled -- lsp-set-options ${PORT_NAME} requested-chassis="${CHASSIS_NAME}" 2>&1 | tee -a $0.log
+
+  dns_update "${PORT_NAME}"
+  dns_reload
+
+  else
+    echo 'ovn_nbctl_add_port usage: ovn_nbctl_add_port <bridge_name> <port_name> <chassis_name>' 2>&1 | tee -a $0.log
+  fi
+}
+
+# lxc_status will check if a container is running, optionally over ssh
+# lxc_status usage: lxc_status <CONTAINER_NAME> [SSH]
+function lxc_status {
+  local CONTAINER_NAME=$1
+  local SSH=$2
+  if [[ -n "${CONTAINER_NAME}" ]]; then
+    local STATUS=`${SSH} lxc-info -s -n ${CONTAINER_NAME}|awk '{print $2}'`
+    local PID=`${SSH} lxc-info -p -n ${CONTAINER_NAME}|awk '{print $2}'`
+    local IP=`${SSH} lxc-info -i -n ${CONTAINER_NAME}|awk '{print $2}'`
+    echo "CONTAINER_NAME ${CONTAINER_NAME}" 2>&1 | tee -a $0.log
+    echo "STATUS ${STATUS}" 2>&1 | tee -a $0.log
+    echo "PID ${PID}" 2>&1 | tee -a $0.log
+    echo "IP ${IP}" 2>&1 | tee -a $0.log
+    while [[ "${STATUS}" != "RUNNING" || "${PID}" == "" || "${IP}" == "" ]]; do
+      sleep 1
+      STATUS=`${SSH} lxc-info -s -n ${CONTAINER_NAME}|awk '{print $2}'`
+      PID=`${SSH} lxc-info -p -n ${CONTAINER_NAME}|awk '{print $2}'`
+      IP=`${SSH} lxc-info -i -n ${CONTAINER_NAME}|awk '{print $2}'`
+      echo "CONTAINER_NAME ${CONTAINER_NAME}" 2>&1 | tee -a $0.log
+      echo "STATUS ${STATUS}" 2>&1 | tee -a $0.log
+      echo "PID ${PID}" 2>&1 | tee -a $0.log
+      echo "IP ${IP}" 2>&1 | tee -a $0.log
+    done
+  else
+    echo 'lxc_status usage: lxc_status <CONTAINER_NAME> [SSH]' 2>&1 | tee -a $0.log
+  fi
+}
+
+# lxc_config creates a linux container config file, optionally over ssh
+# usage: lxc_config <CONTAINER_NAME> [SSH]
+function lxc_config {
+  if [[ -z "${OVN_NB_DB}" ]]; then
+    echo 'OVN_NB_DB envvar is not set. Exiting lxc_config...' 2>&1 | tee -a $0.log
+    exit 1
+  fi
+  local CONTAINER_NAME=$1
+  local SSH=$2
+  if [[ -n "${CONTAINER_NAME}" ]]; then
+    echo "${SSH} mkdir -p /var/lib/lxc/$1/rootfs" 2>&1 | tee -a $0.log
+    ${SSH} mkdir -p /var/lib/lxc/$1/rootfs 2>&1 | tee -a $0.log
+    
+    echo "${SSH} chmod 770 -R /var/lib/lxc/$1" 2>&1 | tee -a $0.log
+    ${SSH} chmod 770 -R /var/lib/lxc/$1 2>&1 | tee -a $0.log
+    
+    echo "export PORT_NAME=${CONTAINER_NAME}" 2>&1 | tee -a $0.log
+    export local PORT_NAME=${CONTAINER_NAME}
+    export local MAC_ADDR=`ovn-nbctl find logical_switch_port name=${CONTAINER_NAME} | egrep "^dynamic_addresses "|cut -f2- -d":"|cut -f2 -d" "|tr -d "\""`
+    
+    while [[ "${MAC_ADDR}" == "[]" ]]; do
+      read -p "MAC_ADDR is empty. Would you like to wait a bit and try to get it again? [Y/n]"
+      if [[ "${REPLY}" == "n" ]]; then
+        echo "Sorry, installation cannot be continued without the MAC_ADDR"
+        exit 1
+      fi
+      export local MAC_ADDR=`ovn-nbctl find logical_switch_port name=${CONTAINER_NAME} | egrep "^dynamic_addresses "|cut -f2- -d":"|cut -f2 -d" "|tr -d "\""`
+    done
+    echo "MAC_ADDR=${MAC_ADDR}" 2>&1 | tee -a $0.log
+    echo "export UTS_NAME=${CONTAINER_NAME}" 2>&1 | tee -a $0.log
+    export local UTS_NAME=${CONTAINER_NAME}
+    echo "export RBD_POOL=${RBD_POOL}" 2>&1 | tee -a $0.log
+    export RBD_POOL
+    echo "envsubst < ${BASE_DIR}/common/lxc-config.template | ${SSH} dd status=none of=/var/lib/lxc/${CONTAINER_NAME}/config" 2>&1 | tee -a $0.log
+    envsubst < ${BASE_DIR}/common/lxc-config.template | ${SSH} dd status=none of=/var/lib/lxc/${CONTAINER_NAME}/config
+  else
+    echo 'lxc_config usage: lxc_config <CONTAINER_NAME> [SSH]' 2>&1 | tee -a $0.log
+  fi
+}
+
+# lxc_set_hostname will configure container's hostname, optionally over ssh
+# lxc_set_hostname usage: lxc_set_hostname <CONTAINER_NAME> [SSH]
+function lxc_set_hostname {
+  local CONTAINER_NAME=$1
+  local SSH=$2
+  if [[ -n "${CONTAINER_NAME}" ]]; then
+    lxc_status "${CONTAINER_NAME}" "${SSH}"
+    echo "${SSH} lxc-attach -v CONTAINER_NAME -n ${CONTAINER_NAME} -- dd status=none of=/etc/hostname <<<\"${CONTAINER_NAME}.${DOMAIN_NAME}\"" 2>&1 | tee -a $0.log
+    ${SSH} lxc-attach -v CONTAINER_NAME -n ${CONTAINER_NAME} -- dd status=none of=/etc/hostname <<<"${CONTAINER_NAME}.${DOMAIN_NAME}" 2>&1 | tee -a $0.log
+  else
+    echo 'lxc_set_hostname usage: lxc_set_hostname <CONTAINER_NAME> [SSH]' 2>&1 | tee -a $0.log
+  fi
+}
+
+# lxc_set_hosts will configure container's /etc/hosts file, optionally over ssh
+# lxc_set_hosts usage: lxc_set_hosts <CONTAINER_NAME> [SSH]
+function lxc_set_hosts {
+  if [[ -z "${OVN_NB_DB}" ]]; then
+    echo 'OVN_NB_DB envvar is not set. Exiting lxc_set_hosts...' 2>&1 | tee -a $0.log
+    exit 1
+  fi
+  local CONTAINER_NAME=$1
+  local SSH=$2
+  if [[ -n "${CONTAINER_NAME}" ]]; then
+    lxc_status "${CONTAINER_NAME}" "${SSH}"
+    local IP=`ovn-nbctl find logical_switch_port name=${CONTAINER_NAME} | egrep "^dynamic_addresses "|cut -f2- -d":"|cut -f3 -d" "|tr -d "\""`
+    echo "IP=${IP}" 2>&1 | tee -a $0.log
+
+    local LXC="lxc-attach --keep-env -n ${CONTAINER_NAME} --"
+
+    echo "${SSH} ${LXC} dd status=none of=/etc/hosts <<<\"${IP} ${CONTAINER_NAME}.${DOMAIN_NAME} ${CONTAINER_NAME}\"" 2>&1 | tee -a $0.log
+    ${SSH} ${LXC} dd status=none of=/etc/hosts <<<"${IP} ${CONTAINER_NAME}.${DOMAIN_NAME} ${CONTAINER_NAME}"
+
+    echo "${SSH} ${LXC} dd status=none oflag=append conv=notrunc of=/etc/hosts <<<\"127.0.0.1 localhost\"" 2>&1 | tee -a $0.log
+    ${SSH} ${LXC} dd status=none oflag=append conv=notrunc of=/etc/hosts <<<"127.0.0.1 localhost"
+
+# dhcp client should have taken care of dns setup but DHCP option domain_name currently does not work in OVN
+    if [[ -n "${DNS_SERVER_IP1}" && -n "${DNS_SERVER_IP2}" && -n "${DNS_SERVER_IP3}" && -n "${DOMAIN_NAME}" ]]; then
+      echo "envsubst < ${BASE_DIR}/common/resolv.conf.template | ${SSH} dd status=none of=/etc/resolv.conf" 2>&1 | tee -a $0.log
+      envsubst < ${BASE_DIR}/common/resolv.conf.template | ${SSH} dd status=none of=/etc/resolv.conf
+    fi
+
+  else
+    echo 'lxc_set_hosts usage: lxc_set_hosts <CONTAINER_NAME> [SSH]' 2>&1 | tee -a $0.log
+  fi
+}
+
+# This function should no longer be used in ubuntu because of fully functioning DNS servers
+# lxc_set_llmnr will configure container's local link multicast name resolution (LLMNR), optionally over ssh
+# lxc_set_llmnr usage: lxc_set_llmnr <CONTAINER_NAME> [SSH]
+function lxc_set_llmnr {
+  local CONTAINER_NAME=$1
+  local SSH=$2
+  if [[ -n "${CONTAINER_NAME}" ]]; then
+    lxc_status "${CONTAINER_NAME}" "${SSH}"
+    echo "${SSH} lxc-attach -n ${CONTAINER_NAME} -- dd status=none oflag=append conv=notrunc of=/etc/systemd/resolved.conf <<<\"LLMNR=true\"" 2>&1 | tee -a $0.log
+    ${SSH} lxc-attach -n ${CONTAINER_NAME} -- dd status=none oflag=append conv=notrunc of=/etc/systemd/resolved.conf <<<"LLMNR=true"
+  else
+    echo 'lxc_set_llmnr usage: lxc_set_llmnr <CONTAINER_NAME> [SSH]' 2>&1 | tee -a $0.log
+  fi
+}
+
+# This function is not really needed because static routes are configured via DHCP
+# static_route_check will check and install the static route if needed
+# static_route_check usage: static_route_check <CONTAINER_NAME> <CIDR> <GW>
+function static_route_check {
+  local CONTAINER_NAME=$1
+  if (( $# == 3 )); then
+    local CIDR=$2
+    local GW=$3
+  else
+    echo 'static_route_check: static_route_check <CONTAINER_NAME> <CIDR> <GW>' 2>&1 | tee -a $0.log
+    exit 1
+  fi
+
+  local LXC="lxc-attach --keep-env -n ${CONTAINER_NAME} --"
+
+  echo "COMPUTE_NETWORK_ROUTE=\`${LXC} ip route list ${CIDR}\`" 2>&1 | tee -a $0.log
+  COMPUTE_NETWORK_ROUTE=`${LXC} ip route list ${CIDR}`
+  echo "COMPUTE_NETWORK_ROUTE=${COMPUTE_NETWORK_ROUTE}" 2>&1 | tee -a $0.log
+  if [[ "${COMPUTE_NETWORK_ROUTE}" == "" ]]; then
+
+    case "${DOWNLOAD_DIST}" in
+    "ubuntu")
+      echo "envsubst < ${BASE_DIR}/common/99-static-route.yaml > /tmp/99-static-route.yaml" 2>&1 | tee -a $0.log
+      envsubst < ${BASE_DIR}/common/99-static-route.yaml > /tmp/99-static-route.yaml
+      
+      echo "${LXC} tee /etc/netplan/99-static-route.yaml < /tmp/99-static-route.yaml" 2>&1 | tee -a $0.log
+      ${LXC} tee /etc/netplan/99-static-route.yaml < /tmp/99-static-route.yaml
+
+      echo "rm -f /tmp/99-static-route.yaml" 2>&1 | tee -a $0.log
+      rm -f /tmp/99-static-route.yaml 2>&1 | tee -a $0.log
+    ;;
+    "alpine")
+      echo "envsubst < ${BASE_DIR}/common/route.conf > /tmp/route.conf" 2>&1 | tee -a $0.log
+      envsubst < ${BASE_DIR}/common/route.conf > /tmp/route.conf
+      echo "${LXC} tee /etc/route.conf < /tmp/route.conf" 2>&1 | tee -a $0.log
+      ${LXC} tee /etc/route.conf < /tmp/route.conf 2>&1 | tee -a $0.log
+      echo "rm -f /tmp/route.conf" 2>&1 | tee -a $0.log
+      rm -f /tmp/route.conf 2>&1 | tee -a $0.log
+      echo "${LXC} rc-update add staticroute" 2>&1 | tee -a $0.log
+      ${LXC} rc-update add staticroute 2>&1 | tee -a $0.log
+      echo "${LXC} /etc/init.d/staticroute start" 2>&1 | tee -a $0.log
+      ${LXC} /etc/init.d/staticroute start 2>&1 | tee -a $0.log
+    ;;
+    esac
+    echo "${LXC} ip route add ${CIDR} via ${GW} proto static" 2>&1 | tee -a $0.log
+    ${LXC} ip route add ${CIDR} via ${GW} proto static 2>&1 | tee -a $0.log
+  fi
+}
+
+# lxc_wait will run a command and displays a prompt: [y] answer will continue and [N] will re-run the command, optionally over ssh
+# lxc_wait usage: lxc_wait <CONTAINER_NAME> <COMMAND> <PROMPT> [SSH]
+function lxc_wait {
+  local CONTAINER_NAME=$1
+  local COMMAND=$2
+  local PROMPT=$3
+  local SSH=$4
+  local LXC="lxc-attach --keep-env -n ${CONTAINER_NAME} --"
+  if [[ -n "${CONTAINER_NAME}" && -n "${COMMAND}" && -n "${PROMPT}" ]]; then
+    echo "${SSH} ${LXC} ${COMMAND}" 2>&1 | tee -a $0.log
+    ${SSH} ${LXC} ${COMMAND}
+    read -p "${PROMPT}"
+    while [[ "${REPLY}" != "y" ]]; do
+      echo "${SSH} ${LXC} ${COMMAND}" 2>&1 | tee -a $0.log
+      ${SSH} ${LXC} ${COMMAND}
+      read -p "${PROMPT}"
+    done
+  else
+    echo 'lxc_wait usage: lxc_wait <CONTAINER_NAME> <COMMAND> <PROMPT> [SSH]' 2>&1 | tee -a $0.log
+  fi
+}
+
+# haproxy_delete_rules will remove the load-balancing rules for the container from all controllers
+# haproxy_delete_rules usage: haproxy_delete_rules <CONTAINER_NAME>
+function haproxy_delete_rules {
+  local CONTAINER_NAME=$1
+  if [[ -n "${CONTAINER_NAME}" ]]; then
+    for (( i = 1; i <= NUMBER_OF_CONTROLLERS; i++ )); do
+      if (( i > 1 )); then
+        SSH="ssh ${CONTROLLER_NAME}-${i}"
+      else
+        SSH=""
+      fi
+      local LXC="lxc-attach -n ${HAPROXY_CONTAINER_NAME}-${i} --"
+      echo "${SSH} ${LXC} sed -i \"/${CONTAINER_NAME}/d\" /etc/haproxy/haproxy.cfg" 2>&1 | tee -a $0.log
+
+      ${SSH} ${LXC} sed -i "/${CONTAINER_NAME}/d" /etc/haproxy/haproxy.cfg 2>&1 | tee -a $0.log
+
+      echo "${SSH} ${LXC} service haproxy reload" 2>&1 | tee -a $0.log
+      ${SSH} ${LXC} service haproxy reload 2>&1 | tee -a $0.log
+    done
+  else
+    echo 'haproxy_delete_rules usage: haproxy_delete_rules <CONTAINER_NAME>' 2>&1 | tee -a $0.log
+  fi
+}
+
+# image_resize will resize the ceph image
+# image_resize usage: image_resize <CONTAINER_NAME> <SIZE>
+function image_resize {
+  local CONTAINER_NAME=$1
+  local SIZE=$2
+  if [[ -n "${CONTAINER_NAME}" && -n "${SIZE}" ]]; then
+
+    local RBD="rbd -c ${CEPH_CONF} -k ${CEPH_CLIENT_KEYRING} --id ${CEPH_CLIENT} --pool ${RBD_POOL}"
+
+    echo "${RBD} resize ${CONTAINER_NAME} --size ${SIZE}" 2>&1 | tee -a $0.log
+    ${RBD} resize ${CONTAINER_NAME} --size ${SIZE} 2>&1 | tee -a $0.log
+
+    # check if the block device exists and if not, then create it
+    if [[ ! -b /dev/rbd/${RBD_POOL}/${CONTAINER_NAME} ]]; then
+      echo "${RBD} device map ${CONTAINER_NAME}" 2>&1 | tee -a $0.log 
+      ${RBD} device map ${CONTAINER_NAME} 2>&1 | tee -a $0.log
+    fi
+
+    # check and resize the file system after disk resizing
+    echo "e2fsck -p -f /dev/rbd/${RBD_POOL}/${CONTAINER_NAME}" 2>&1 | tee -a $0.log
+    e2fsck -p -f /dev/rbd/${RBD_POOL}/${CONTAINER_NAME} 2>&1 | tee -a $0.log
+
+    echo "resize2fs /dev/rbd/${RBD_POOL}/${CONTAINER_NAME}" 2>&1 | tee -a $0.log
+    resize2fs /dev/rbd/${RBD_POOL}/${CONTAINER_NAME} 2>&1 | tee -a $0.log
+
+    # unmap block device (it will be mapped by lxc-start using hook
+    echo "${RBD} device unmap ${CONTAINER_NAME}" 2>&1 | tee -a $0.log 
+    ${RBD} device unmap ${CONTAINER_NAME} 2>&1 | tee -a $0.log
+  else
+    echo 'image_resize usage: image_resize <CONTAINER_NAME> <SIZE>' 2>&1 | tee -a $0.log
+  fi
+}
+
+# a wrapper for linux container creation
+# usage: create_container <CONTAINER_NAME> <CHASSIS_NAME> [SSH]
+function create_container {
+  local CONTAINER_NAME=$1
+  local CHASSIS_NAME=$2
+  local SSH=$3
+  if [[ -n "${CONTAINER_NAME}" && -n "${CHASSIS_NAME}" ]]; then
+    # create OVN port
+    ovn_nbctl_add_port "${BR_INTERNAL}" "${CONTAINER_NAME}" "${CHASSIS_NAME}"
+
+    # configure the clone
+    lxc_config "${CONTAINER_NAME}" "${SSH}"
+
+    # start the clone
+    echo "${SSH} lxc-start -n ${CONTAINER_NAME}" 2>&1 | tee -a $0.log
+    ${SSH} lxc-start -n ${CONTAINER_NAME} 2>&1 | tee -a $0.log
+
+    # set clone's hostname, /etc/hosts
+    lxc_set_hostname "${CONTAINER_NAME}" "${SSH}"
+    lxc_set_hosts "${CONTAINER_NAME}" "${SSH}"
+
+    # restart the clone
+    echo "${SSH} lxc-stop -n  ${CONTAINER_NAME}" 2>&1 | tee -a $0.log
+    ${SSH} lxc-stop -n  ${CONTAINER_NAME} 2>&1 | tee -a $0.log
+    echo "${SSH} lxc-start -n  ${CONTAINER_NAME}" 2>&1 | tee -a $0.log
+    ${SSH} lxc-start -n  ${CONTAINER_NAME} 2>&1 | tee -a $0.log
+    lxc_status "${CONTAINER_NAME}" "${SSH}"
+  else
+    echo 'create_container usage: create_container <CONTAINER_NAME> <CHASSIS_NAME> [SSH]' 2>&1 | tee -a $0.log
+  fi
+}

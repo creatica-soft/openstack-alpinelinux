@@ -1,0 +1,21 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="Neutron network openstack service"
+command="/bin/neutron-server"
+command_user="neutron:neutron"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+#supervise_daemon_args="--stdout /var/log/neutron/neutron-server.out --stderr /var/log/neutron/neutron-server.err"
+directory=/var/lib/neutron
+required_files=/etc/neutron/neutron.conf
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+#output_logger="/usr/bin/logger"
+#error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}

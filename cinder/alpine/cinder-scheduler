@@ -1,0 +1,21 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="Cinder scheduler volume openstack service"
+command="/bin/cinder-scheduler"
+command_user="cinder:cinder"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+#supervise_daemon_args="--stdout /var/log/cinder/cinder-scheduler.out --stderr /var/log/cinder/cinder-scheduler.err"
+directory=/var/lib/cinder
+required_files=/etc/cinder/cinder.conf
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+#output_logger="/usr/bin/logger"
+#error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}

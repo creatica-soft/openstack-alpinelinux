@@ -1,0 +1,21 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="Glance image openstack service"
+command="/bin/glance-api"
+command_user="glance:glance"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+#supervise_daemon_args="--stdout /var/log/glance/glance.out --stderr /var/log/glance/glance.err"
+directory=/var/lib/glance
+required_files=/etc/glance/glance-api.conf
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+#output_logger="/usr/bin/logger"
+#error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}

@@ -1,0 +1,26 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="Nova compute openstack service"
+command="/bin/nova-compute"
+command_args="--config-file=/etc/nova/nova.conf --config-file=/etc/nova/nova-compute.conf --log-file=/var/log/nova/nova-compute.log"
+command_user="nova:nova"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+supervise_daemon_args="--stdout /var/log/nova/nova-compute.out --stderr /var/log/nova/nova-compute.err"
+directory=/var/lib/nova
+required_files=/etc/nova/nova.conf
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+output_logger="/usr/bin/logger"
+error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}
+
+start_pre() {
+  ovs-appctl -t ovsdb-server ovsdb-server/add-remote ptcp:6640:127.0.0.1
+}

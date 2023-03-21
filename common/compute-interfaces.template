@@ -1,0 +1,11 @@
+auto lo 
+iface lo inet loopback
+
+auto ${COMPUTE_NETWORK_IFACE}
+iface ${COMPUTE_NETWORK_IFACE} inet static
+        address ${IP_ADDR}
+        netmask ${NETMASK}
+        gateway ${GW}
+        post-up ip link set dev ${COMPUTE_NETWORK_IFACE} txqueuelen 10000
+
+auto ${PROVIDER_NETWORK_IFACE}

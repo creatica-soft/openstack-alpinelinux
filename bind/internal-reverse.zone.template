@@ -1,0 +1,11 @@
+$TTL 10m
+@ SOA ns.${DOMAIN_NAME}. root.${DOMAIN_NAME}.  (
+  2021050101 ; Serial
+  86400      ; Refresh
+  7200       ; Retry
+  3600000    ; Expire
+  3600       ; Negative TTL (Minimum) 
+)     
+@ NS ns.${DOMAIN_NAME}.
+@ NS ns-2.${DOMAIN_NAME}.
+@ NS ns-3.${DOMAIN_NAME}.

@@ -1,0 +1,32 @@
+[DEFAULT]
+#core_plugin = ml2
+#transport_url = rabbit://openstack:${RABBITMQ_PASS}@${RABBITMQ_CONTAINER_IP1}:5672,openstack:${RABBITMQ_PASS}@${RABBITMQ_CONTAINER_IP2}:5672,openstack:${RABBITMQ_PASS}@${RABBITMQ_CONTAINER_IP3}:5672/
+#auth_strategy = keystone
+[agent]
+root_helper = "sudo /usr/bin/neutron-rootwrap /etc/neutron/rootwrap.conf"
+[cors]
+[database]
+[ironic]
+[keystone_authtoken]
+#www_authenticate_uri = http://${OS_PUBLIC_ENDPOINT}:5000/
+#auth_url = http://${HAPROXY_IP}:5000/
+#memcached_servers = ${MEMCACHED_CONTAINER_IP1}:11211,${MEMCACHED_CONTAINER_IP2}:11211,${MEMCACHED_CONTAINER_IP3}:11211
+#auth_type = password
+#project_domain_name = Default
+#user_domain_name = Default
+#project_name = service
+#username = neutron
+#password = ${NEUTRON_DBPASS}
+#service_token_roles_required = true
+[nova]
+[oslo_concurrency]
+lock_path = /var/lib/neutron/tmp
+[oslo_messaging_amqp]
+[oslo_messaging_kafka]
+[oslo_messaging_notifications]
+[oslo_messaging_rabbit]
+[oslo_middleware]
+[oslo_policy]
+[privsep]
+[quotas]
+[ssl]

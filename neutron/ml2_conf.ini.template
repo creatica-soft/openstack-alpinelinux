@@ -1,0 +1,29 @@
+[DEFAULT]
+[ml2]
+type_drivers = local,flat,vlan,geneve
+tenant_network_types = geneve
+mechanism_drivers = ovn
+extension_drivers = port_security
+overlay_ip_version = 4
+[ml2_type_flat]
+flat_networks = provider
+[ml2_type_geneve]
+vni_ranges = 1:65536
+max_header_size = 38
+[ml2_type_gre]
+[ml2_type_vlan]
+[ml2_type_vxlan]
+vni_ranges = 1:1000
+[ovs_driver]
+[securitygroup]
+enable_ipset = true
+enable_security_group = true
+[sriov_driver]
+[ovn]
+ovn_nb_connection = ${OVN_NB_DB}
+ovn_sb_connection = ${OVN_SB_DB}
+ovn_l3_scheduler = leastloaded
+enable_distributed_floating_ip = true
+ovn_metadata_enabled = true
+dns_servers = ${DNS_SERVERS}
+neutron_sync_mode = off

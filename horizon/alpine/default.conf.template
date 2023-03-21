@@ -1,0 +1,21 @@
+server {
+  listen 80 default_server;
+  server_name ${HORIZON_CONTAINER_NAME}.${DOMAIN_NAME};
+  access_log syslog:server=unix:/dev/log,facility=daemon,tag=nginx,severity=info combined;
+
+  location / {
+    proxy_pass http://horizon/;
+    proxy_redirect http://horizon/ http://$server_name:8000/;
+    #websocket support for novncproxy
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection $connection_upgrade;
+    proxy_read_timeout 600s;
+  }
+  location /static/ {
+    alias /var/lib/openstack-dashboard/static/;
+  }
+  location /horizon/static/ {
+    alias /var/lib/openstack-dashboard/static/;
+  }
+}

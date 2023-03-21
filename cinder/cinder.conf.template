@@ -1,0 +1,39 @@
+[DEFAULT]
+use_syslog = true
+syslog_log_facility = LOG_LOCAL7
+#default_log_levels = amqp=WARN,amqplib=WARN,boto=WARN,qpid=WARN,sqlalchemy=WARN,suds=INFO,oslo.messaging=INFO,oslo_messaging=INFO,iso8601=WARN,requests.packages.urllib3.connectionpool=WARN,urllib3.connectionpool=WARN,websocket=WARN,requests.packages.urllib3.util.retry=WARN,urllib3.util.retry=WARN,keystonemiddleware=WARN,routes.middleware=WARN,stevedore=WARN,taskflow=WARN,keystoneauth=WARN,oslo.cache=INFO,oslo_policy=INFO,dogpile.core.dogpile=INFO
+#rate_limit_interval = 0
+#rate_limit_burst = 0
+#rate_limit_except_level = ERROR
+enable_v2_api=false
+enable_v3_api=true
+rootwrap_config = /etc/cinder/rootwrap.conf
+api_paste_confg = /etc/cinder/api-paste.ini
+iscsi_helper = tgtadm
+volume_name_template = volume-%s
+volume_group = cinder-volumes
+#verbose = True
+state_path = /var/lib/cinder
+lock_path = /var/lock/cinder
+volumes_dir = /var/lib/cinder/volumes
+enabled_backends = ceph
+glance_api_version = 2
+transport_url = rabbit://openstack:${RABBITMQ_PASS}@${RABBITMQ_CONTAINER_NAME}-1:5672,openstack:${RABBITMQ_PASS}@${RABBITMQ_CONTAINER_NAME}-2:5672,openstack:${RABBITMQ_PASS}@${RABBITMQ_CONTAINER_NAME}-3:5672/
+[database]
+connection = ${SQL_DIALECT}+${SQL_DRIVER}://cinder:${CINDER_DBPASS}@${SQL_CONTAINER_NAME}/cinder
+${SLAVE_CONNECTION} = ${SQL_DIALECT}+${SQL_DRIVER}://cinder:${CINDER_DBPASS}@${HAPROXY_CONTAINER_NAME}/cinder
+[keystone_authtoken]
+www_authenticate_uri = http://${OS_PUBLIC_ENDPOINT}:5000/
+auth_url = http://${OS_INTERNAL_ENDPOINT}:5000/
+memcached_servers = ${MEMCACHED_CONTAINER_NAME}-1:11211,${MEMCACHED_CONTAINER_NAME}-2:11211,${MEMCACHED_CONTAINER_NAME}-3:11211
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+project_name = service
+username = cinder
+password = ${CINDER_DBPASS}
+# service_token_roles_required should be set to true but nova's neutron client (v2.0) does not yet support service tokens, 
+# so it won't work if set to true
+#service_token_roles_required = true
+[oslo_concurrency]
+lock_path = /var/lib/cinder/tmp

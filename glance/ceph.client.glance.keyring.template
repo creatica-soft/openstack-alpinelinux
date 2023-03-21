@@ -1,0 +1,2 @@
+[client.${CEPH_GLANCE_LOGIN}]
+key = ${CEPH_GLANCE_KEY}
