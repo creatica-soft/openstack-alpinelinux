@@ -1,0 +1,7 @@
+log.syslog = true
+log.syslog.transport = udp
+log.syslog.protocol = rfc5424
+log.syslog.host = localhost
+log.syslog.port = 514
+log.syslog.facility = local1
+log.default.level = warning

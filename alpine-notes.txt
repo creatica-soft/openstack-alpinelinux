@@ -1,0 +1,12 @@
+cat /etc/alpine-release
+3.13.5
+
+o3p-os-controller-4:~# df -h
+Filesystem                Size      Used Available Use% Mounted on
+devtmpfs                 10.0M         0     10.0M   0% /dev
+shm                       1.9G         0      1.9G   0% /dev/shm
+/dev/sda3                11.3G    165.2M     10.5G   2% /
+tmpfs                   394.2M    104.0K    394.1M   0% /run
+/dev/sda1               511.0M    272.0K    510.7M   0% /boot/efi
+
+

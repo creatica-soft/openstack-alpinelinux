@@ -1,0 +1,59 @@
+{
+  "builders": [
+    {
+      "type": "qemu",
+      "headless": "true",
+      "boot_command": [
+        "root<enter><wait>",
+        "ifconfig eth0 up \u0026\u0026 udhcpc -i eth0<enter><wait10>",
+        "wget http://{{ .HTTPIP }}:{{ .HTTPPort }}/answers<enter><wait5>",
+        "setup-alpine -f answers<enter><wait60>",
+        "{{user `root_pw`}}<enter><wait>",
+        "{{user `root_pw`}}<enter><wait60>",
+        "<wait>y<enter><wait60><wait60>",
+        "service sshd stop<enter><wait5>",
+        "mount /dev/vda3 /mnt<enter><wait>",
+        "sed -i -e '/^#PermitRootLogin/cPermitRootLogin yes' /mnt/etc/ssh/sshd_config<enter><wait>",
+        "umount /mnt<enter><wait>",
+        "reboot<enter>"
+      ],
+      "disk_size": "{{user `disk`}}",
+      "iso_checksum": "file:${SAMPLE_IMAGE_URL}.sha256",
+      "iso_url": "${SAMPLE_IMAGE_URL}",
+      "http_directory": "http",
+      "shutdown_command": "poweroff",
+      "ssh_password": "{{user `root_pw`}}",
+      "ssh_username": "root",
+      "ssh_timeout": "200s",
+      "vm_name": "${SAMPLE_IMAGE_FILE}.raw",
+      "net_device": "virtio-net",
+      "net_bridge": "virbr0",
+      "qemuargs": [
+        ["-netdev", "bridge,id=user.0,br=virbr0,helper=/usr/lib/qemu/qemu-bridge-helper"]
+      ],
+      "disk_interface": "virtio",
+      "boot_wait": "100s",
+      "format": "raw",
+      "output_directory": "output_alpine",
+      "vnc_bind_address": "0.0.0.0",
+      "vnc_port_min": "5915",
+      "vnc_port_max": "5915"
+    }
+  ],
+  "provisioners": [
+    {
+      "scripts": [
+        "scripts/provision.sh"
+      ],
+      "type": "shell"
+    }
+  ],
+  "variables": {
+    "cpus": "1",
+    "disk": "512",
+    "mem": "1024",
+    "root_pw": "alpine",
+    "ssh_pass": "alpine",
+    "ssh_user": "alpine"
+  }
+}

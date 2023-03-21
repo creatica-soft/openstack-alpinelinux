@@ -1,0 +1,7 @@
+host      all         postgres 127.0.0.1/32 trust
+host      replication postgres ${POSTGRES_IP}/32 password
+host      replication postgres ${IP_ADDR1}/32    password
+host      replication postgres ${IP_ADDR2}/32    password
+host      replication postgres ${IP_ADDR3}/32    password
+hostnossl all         all      0.0.0.0/0    password
+hostssl   all         all      0.0.0.0/0    password

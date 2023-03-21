@@ -1,0 +1,8 @@
+#!/bin/sh
+
+# this hook should be placed in /etc/networkd-dispatcher/routable.d/
+
+for d in up post-up; do
+  ip link set dev ${d} txqueuelen 10000
+done
+exit 0

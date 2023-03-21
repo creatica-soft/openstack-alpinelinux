@@ -1,0 +1,24 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="OVN northd daemon"
+command="/usr/bin/ovn-northd"
+command_args="-vconsole:off -vsyslog:warn -vfile:off  -vFACILITY:local0 --ovnnb-db=${OVN_NB_DB} --ovnsb-db=${OVN_SB_DB} --no-chdir --pidfile=/var/run/ovn/ovn-northd.pid"
+command_user="root:root"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+#supervise_daemon_args="--stdout /var/log/ovn/ovn-northd.out --stderr /var/log/ovn/ovn-northd.err"
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+#output_logger="/usr/bin/logger"
+#error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}
+
+start_pre() {
+  mkdir -p /var/run/ovn
+}

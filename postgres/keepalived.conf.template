@@ -1,0 +1,55 @@
+global_defs {
+   notification_email {
+     ${KEEPALIVED_NOTIFICATION_EMAIL}
+   }
+   notification_email_from ${KEEPALIVED_EMAIL_FROM}
+   smtp_server ${KEEPALIVED_SMTP_SERVER}
+   smtp_connect_timeout 30
+   vrrp_skip_check_adv_addr
+   script_user root root
+   enable_script_security
+   vrrp_check_unicast_src
+   max_auto_priority -1
+}
+
+vrrp_script chk_postgres {
+    script "/var/lib/postgresql/check_postgres.sh"
+    user postgres postgres
+    interval 10
+    weight -150
+}
+
+vrrp_instance VI_1 {
+    @${CONTAINER_NAME}-1 state MASTER
+    @${CONTAINER_NAME}-2 state BACKUP
+    @${CONTAINER_NAME}-3 state BACKUP
+    interface ${KEEPALIVED_IFACE}
+    virtual_router_id 52
+    @${CONTAINER_NAME}-1 priority 250
+    @${CONTAINER_NAME}-2 priority 250
+    @${CONTAINER_NAME}-3 priority 250
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass ${KEEPALIVED_AUTH_PASS}
+    }
+    virtual_ipaddress {
+        ${POSTGRES_IP}
+    }
+!   use unicast adverts instead of multicast
+    unicast_peer {
+        @${CONTAINER_NAME}-3 ${IP_ADDR1}
+        @${CONTAINER_NAME}-3 ${IP_ADDR2}
+        @${CONTAINER_NAME}-2 ${IP_ADDR1}
+        @${CONTAINER_NAME}-2 ${IP_ADDR3}
+        @${CONTAINER_NAME}-1 ${IP_ADDR2}
+        @${CONTAINER_NAME}-1 ${IP_ADDR3}
+    }
+    track_script {
+        chk_postgres
+    }
+    notify_master "/var/lib/postgresql/promote.sh" postgres postgres
+!    notify_backup "/var/lib/postgresql/demote.sh" root root 
+!    smtp_alert true
+
+}

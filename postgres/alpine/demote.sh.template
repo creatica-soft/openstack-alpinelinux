@@ -1,0 +1,35 @@
+#!/bin/ash
+
+su postgres -s /bin/sh -c 'pg_isready -h 0.0.0.0 -d postgres -U postgres'
+while [[ $? > 0 ]]; do
+  echo "Postgres is not ready. Attempt to start it"
+  su postgres -s /bin/sh -c 'pg_ctl start -D /var/lib/postgresql/13/data'
+  sleep 5
+  su postgres -s /bin/sh -c 'pg_isready -h 0.0.0.0 -d postgres -U postgres'
+done
+
+MODE=`su postgres -s /bin/sh -c "psql -h 0.0.0.0 -U postgres -d postgres --csv -t -n -c 'select pg_is_in_recovery();'"`
+if [[ "${MODE}" == "t" ]]; then
+  echo "Already slave"
+  exit
+fi
+
+service postgresql stop
+
+# try pg_rewind first
+su postgres -s /bin/sh -c 'pg_rewind -D /var/lib/postgresql/13/data --source-server="host=postgres port=5432 user=postgres passfile=/var/lib/postgresql/.pgpass"'
+
+# if pg_rewind does not work for any reason, do a full restore
+if [[ $? != 0 ]]; then
+  tar -zcf /root/backup.tar.gz /var/lib/postgresql/13/data
+  rm -rf /var/lib/postgresql/13/data
+  mkdir /var/lib/postgresql/13/data
+  chown postgres:postgres /var/lib/postgresql/13/data
+  chmod 700 /var/lib/postgresql/13/data
+  su postgres -s /bin/sh -c 'pg_basebackup -w -R -X stream -S replication_slot_${i} -d "host=postgres port=5432 user=postgres passfile=/var/lib/postgresql/.pgpass" -D /var/lib/postgresql/13/data'
+  ln -s /etc/postgresql/postgresql.slave /var/lib/postgresql/13/data/postgresql.conf
+  ln -s /etc/postgresql/pg_hba.conf /var/lib/postgresql/13/data/pg_hba.conf
+  ln -s /etc/postgresql/pg_ident.conf /var/lib/postgresql/13/data/pg_ident.conf
+fi
+
+service postgresql start

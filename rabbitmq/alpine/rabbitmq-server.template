@@ -1,0 +1,55 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="RabbitMQ"
+command="/${RABBITMQ}-${RABBITMQ_VERSION}/sbin/rabbitmq-server"
+extra_commands="start_app stop_app reset status cluster_status"
+command_user="rabbitmq:rabbitmq"
+supervisor=supervise-daemon
+respawn_delay=10
+respawn_max=0
+supervise_daemon_args="--env RABBITMQ_CONF_ENV_FILE=/${RABBITMQ}-${RABBITMQ_VERSION}/etc/rabbitmq/rabbitmq-env.conf"
+directory="/var/lib/rabbitmq"
+required_files="/${RABBITMQ}-${RABBITMQ_VERSION}/etc/rabbitmq/rabbitmq-env.conf"
+required_dirs="/var/lib/rabbitmq"
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+#output_logger="/usr/bin/logger"
+#error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}
+
+start() {
+  ebegin "Starting ${RC_SVCNAME}"
+  supervise-daemon ${RC_SVCNAME} --user rabbitmq:rabbitmq --respawn-delay 10 --respawn-max 3 --env RABBITMQ_CONF_ENV_FILE=/${RABBITMQ}-${RABBITMQ_VERSION}/etc/rabbitmq/rabbitmq-env.conf --start ${command}
+  eend $? ""
+}
+
+stop() {
+  ebegin "Stopping ${RC_SVCNAME}"
+  supervise-daemon ${RC_SVCNAME} --stop /${RABBITMQ}-${RABBITMQ_VERSION}/sbin/rabbitmqctl -- shutdown
+  eend $? ""
+}
+
+status() {
+  su -l -s /bin/sh rabbitmq -c "/${RABBITMQ}-${RABBITMQ_VERSION}/sbin/rabbitmqctl status"
+}
+
+cluster_status() {
+  su -l -s /bin/sh rabbitmq -c "/${RABBITMQ}-${RABBITMQ_VERSION}/sbin/rabbitmqctl cluster_status"
+}
+
+start_app() {
+  su -l -s /bin/sh rabbitmq -c "/${RABBITMQ}-${RABBITMQ_VERSION}/sbin/rabbitmqctl start_app"
+}
+
+stop_app() {
+  su -l -s /bin/sh rabbitmq -c "/${RABBITMQ}-${RABBITMQ_VERSION}/sbin/rabbitmqctl stop_app"
+}
+
+reset() {
+  su -l -s /bin/sh rabbitmq -c "/${RABBITMQ}-${RABBITMQ_VERSION}/sbin/rabbitmqctl reset"
+}

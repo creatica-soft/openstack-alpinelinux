@@ -1,0 +1,20 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="OVS vSwitch daemon"
+command="/usr/sbin/ovs-vswitchd"
+command_args="unix:/var/run/openvswitch/db.sock -vconsole:off -vsyslog:info -vfile:off -vFACILITY:local0 --mlockall --no-chdir --pidfile=/var/run/openvswitch/ovs-vswitchd.pid"
+command_user="root:root"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+#supervise_daemon_args="--stdout /var/log/openvswitch/ovs-vswitchd.out --stderr /var/log/openvswitch/ovs-vswitchd.err"
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+#output_logger="/usr/bin/logger"
+#error_logger="/usr/bin/logger"
+
+depend() {
+  need net ovsdb-server
+}

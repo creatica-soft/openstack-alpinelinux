@@ -1,0 +1,24 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="OVN OVSDB NB daemon"
+command="/usr/sbin/ovsdb-server"
+command_args="-vconsole:off -vfile:off -vsyslog:info -vFACILITY:local0 --remote=punix:/var/run/ovn/ovnnb_db.sock --pidfile=/var/run/ovn/ovnnb_db.pid --unixctl=/var/run/ovn/ovnnb_db.ctl --remote=db:OVN_Northbound,NB_Global,connections --private-key=db:OVN_Northbound,SSL,private_key --certificate=db:OVN_Northbound,SSL,certificate --ca-cert=db:OVN_Northbound,SSL,ca_cert --ssl-protocols=db:OVN_Northbound,SSL,ssl_protocols --ssl-ciphers=db:OVN_Northbound,SSL,ssl_ciphers --remote=ptcp:6641:${IP_ADDR} /var/lib/ovn/ovnnb_db.db"
+command_user="root:root"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+#supervise_daemon_args="--stdout /var/log/ovn/ovsdb-server-nb.out --stderr /var/log/ovn/ovsdb-server-nb.err"
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+#output_logger="/usr/bin/logger"
+#error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}
+
+start_pre() {
+  mkdir -p /var/run/ovn
+}

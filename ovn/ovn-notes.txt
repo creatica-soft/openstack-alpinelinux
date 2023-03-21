@@ -1,0 +1,127 @@
+
+on each chassis:
+ovs-vsctl add-br br-lab2
+ovs-vsctl add-port br-lab2 ens256
+ovs-vsctl set open_vswitch . external-ids:ovn-bridge-mappings=lab2:br-lab2,provider=br-provider
+
+
+ovn-nbctl lrp-add router lab2-network 2e:75:06:04:00:00 10.230.185.99/24 -- lrp-set-enabled lab2-network enabled
+
+ovs-vsctl get open_vswitch . external_ids:system-id
+
+ovn-nbctl lrp-set-gateway-chassis lab2-network 4d9a3f53-25f8-48da-8ec0-08b2dc58afd8 1
+ovn-nbctl lrp-set-gateway-chassis lab2-network 534ae132-cecd-4c41-8f6e-21c3648d0613 2
+ovn-nbctl lrp-set-gateway-chassis lab2-network 555e6335-d394-45df-9550-eddd53e13129 3
+
+ovn-nbctl lr-route-add router 10.230.185.0/24 10.230.185.99
+
+ovn-nbctl ls-add br-lab2 -- set logical_switch br-lab2 other-config:mcast_flood_unregistered="false" other_config:mcast_snoop="false"
+
+tail /var/log/ovn/ovn-northd.log
+
+2021-04-20T02:23:54.231Z|00011|ovn_northd|WARN|Bad configuration: multiple ports with redirect-chassis on same logical router router
+2021-04-20T02:23:54.231Z|00012|ovn_northd|WARN|Duplicate MAC set: 2e:75:06:02:00:00
+
+The above error means that we need to either create a separate logical router for lab2 or not use the redirect-chassis for router port lab2-network
+
+Chose the second option:
+
+ovn-nbctl lrp-del-gateway-chassis lab2-network 4d9a3f53-25f8-48da-8ec0-08b2dc58afd8
+ovn-nbctl lrp-del-gateway-chassis lab2-network 534ae132-cecd-4c41-8f6e-21c3648d0613
+ovn-nbctl lrp-del-gateway-chassis lab2-network 555e6335-d394-45df-9550-eddd53e13129
+
+then had to set the gateway-chassis for provider-network again (I guess it was reset when I set it for lab2-network)
+
+ovn-nbctl lrp-sel-gateway-chassis lab2-network 4d9a3f53-25f8-48da-8ec0-08b2dc58afd8 1
+ovn-nbctl lrp-sel-gateway-chassis lab2-network 534ae132-cecd-4c41-8f6e-21c3648d0613 2
+ovn-nbctl lrp-sel-gateway-chassis lab2-network 555e6335-d394-45df-9550-eddd53e13129 3
+
+This restores the chassisredirect type port binding in OVS and hence external connectivity. The parent of chassisredirect type port is one of the pair of the logical_router_port for that network (10.230.186.0//24).
+
+It happens that I still need a separate router for my static route to 10.230.185.0/24 to work. 
+
+lr-route-del router 10.230.185.0/24
+ovn-nbctl lrp-del lab2-network
+
+ovn-nbctl lr-add lab2-router -- lr-route-add lab2-router 10.230.185.0/24 10.230.185.99 -- set logical_router lab2-router enabled=true
+
+ovn-nbctl set logical_switch br-internal other-config:exclude_ips="10.0.0.1 10.0.0.128 10.0.0.254"
+ovn-nbctl lrp-add lab2-router lab2-gateway 2e:75:05:01:00:00 10.0.0.128/24 -- lrp-set-enabled lab2-gateway enabled
+ovn-nbctl lrp-add lab2-router lab2-network 2e:75:05:03:00:00 10.230.185.99/24 -- lrp-set-enabled lab2-gateway enabled
+
+ovn-nbctl lsp-add br-internal lab2-gateway-port -- lsp-set-type lab2-gateway-port router -- lsp-set-addresses lab2-gateway-port router -- lsp-set-options lab2-gateway-port router-port=lab2-gateway -- lsp-set-enabled lab2-gateway-port enabled
+
+ovn-nbctl lsp-add br-lab2 lab2-network-port -- lsp-set-type lab2-network-port router -- lsp-set-addresses lab2-network-port router -- lsp-set-options lab2-network-port router-port=lab2-network nat-addresses=router -- lsp-set-enabled lab2-network-port enabled
+
+ovn-nbctl lsp-add br-lab2 lab2-localnet-port -- lsp-set-type lab2-localnet-port localnet -- lsp-set-addresses lab2-localnet-port unknown -- lsp-set-options lab2-localnet-port network_name="lab2"
+
+ovn-nbctl lrp-set-gateway-chassis lab2-network 4d9a3f53-25f8-48da-8ec0-08b2dc58afd8 1
+ovn-nbctl lrp-set-gateway-chassis lab2-network 534ae132-cecd-4c41-8f6e-21c3648d0613 2
+ovn-nbctl lrp-set-gateway-chassis lab2-network 555e6335-d394-45df-9550-eddd53e13129 3
+
+and... bingo! (chassisredirect type port for distributed lab2-network port is bound!)
+
+ovn-sbctl find port_binding logical_port=cr-lab2-network # cr in chassisredirect type logical_port stands for chassisredirect!
+_uuid               : ea2f0035-202f-437c-b9dd-5a38d272eda8
+chassis             : 2f205dfd-d739-4083-a106-74e83bb65751
+datapath            : 542cb503-6e7b-4d22-a7d6-3776669bebc2
+encap               : []
+external_ids        : {}
+gateway_chassis     : []
+ha_chassis_group    : 9e8cea02-ffd9-43d0-ab11-cad638de8abd
+logical_port        : cr-lab2-network
+mac                 : ["2e:75:05:03:00:00 10.230.185.99/24"]
+nat_addresses       : []
+options             : {distributed-port=lab2-network}
+parent_port         : []
+tag                 : []
+tunnel_key          : 4
+type                : chassisredirect
+virtual_parent      : []
+
+
+
+2021-04-20T08:31:28.155Z|00062|ovsdb_idl|WARN|transaction error: {"details":"Transaction causes multiple rows in \"MAC_Binding\" table to have identical values (lab2-network and \"10.230.185.188\") for index on columns \"logical_port\" and \"ip\".  First row, with UUID bcf3e134-84eb-4a32-a21d-721b37a10e77, was inserted by this transaction.  Second row, with UUID 8bad3356-3039-4a53-b5a5-739912029b13, existed in the database before this transaction and was not modified by the transaction.","error":"constraint violation"}
+2021-04-20T08:31:28.155Z|00063|main|INFO|OVNSB commit failed, force recompute next time.
+
+
+
+
+
+As a side note on duplicate MAC:
+
+2021-04-20T02:23:54.231Z|00012|ovn_northd|WARN|Duplicate MAC set: 2e:75:06:02:00:00
+
+ovn-nbctl list logical_switch_port|grep "2e:75:06:02:00:00"
+nothing there
+
+ovn-nbctl list logical_router_port|grep "2e:75:06:02:00:00"
+mac                 : "2e:75:06:02:00:00"
+
+so only one entry... hm... ok, let's change that mac to 2e:75:05:02:00:00
+
+had to remove the port and re-add it as editing the logical_router_port table was not accepting ":" in 
+ovn-nbctl set logical_router_port <uuid> mac="2e:75:05:02:00:00"
+
+instead 
+ovn-nbct lrp-del provider-network
+ovn-nbctl lrp-add router provider-network "2e:75:05:02:00:00" 10.230.186.149/24
+
+used a different from ${OUI} MAC prefix to avoid conflicts with DHCP MACs
+
+
+
+
+vi /usr/lib/systemd/system/o
+openvswitch-switch.service   ovn-host.service             ovn-ovsdb-server-sb.service
+ovn-central.service          ovn-northd.service           ovs-vswitchd.service
+ovn-controller.service       ovn-ovsdb-server-nb.service  ovsdb-server.service
+
+got rid of confusion services: openvswitch-switch.service (rm from /etc/init.d/), ovn-central.service, ovn-host.service
+
+updated remaining 6 (removed PartOf, updated After, etc): 
+ovn-controller.service 
+ovn-northd.service
+ovn-ovsdb-server-nb.service, ovn-ovsdb-server-sb.service - removed annoying alias, etc
+ovs-vswitchd.service
+ovsdb-server.service

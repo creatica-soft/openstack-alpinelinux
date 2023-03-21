@@ -1,0 +1,24 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="OVSDB server daemon"
+command="/usr/sbin/ovsdb-server"
+command_args="/etc/openvswitch/conf.db -vconsole:off -vsyslog:info -vfile:off -vFACILITY:local0 --remote=punix:/var/run/openvswitch/db.sock --private-key=db:Open_vSwitch,SSL,private_key --certificate=db:Open_vSwitch,SSL,certificate --bootstrap-ca-cert=db:Open_vSwitch,SSL,ca_cert --no-chdir --pidfile=/var/run/openvswitch/ovsdb-server.pid"
+command_user="root:root"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+#supervise_daemon_args="--stdout /var/log/openvswitch/ovsdb-server.out --stderr /var/log/openvswitch/ovsdb-server.err"
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+#output_logger="/usr/bin/logger"
+#error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}
+
+start_pre() {
+  mkdir -p /var/run/openvswitch
+}

@@ -1,0 +1,67 @@
+# All is needed to build a simple openstack alpine image is to install cloud-init apk package - that's all!
+
+# Download the latest alpine-virt iso
+wget https://dl-cdn.alpinelinux.org/alpine/v3.13/releases/x86_64/alpine-virt-3.13.5-x86_64.iso
+
+# Create an empty 512MB image
+qemu-img create -f raw alpine-virt-3.13.5-x86_64.img 512M
+
+# Boot alpine from the iso file using QEMU (or anything else like VirtualBox or VMWare)
+/usr/bin/qemu-system-x86_64 -drive file=alpine-virt-3.13.5-x86_64.img,if=virtio,cache=writeback,discard=ignore,format=raw -drive file=alpine-virt-3.13.5-x86_64.iso,media=cdrom -boot once=d -vnc 0.0.0.0:15 -name alpine -machine type=pc,accel=tcg -netdev bridge,id=user.0,br=virbr0 -m 512M -device virtio-net,netdev=user.0
+
+# Connect to alpine VM with a VNC client to port 0.0.0.0:5915
+
+# login with root (no password)
+# run "setup-alpine" answering "us us" for keyboard, "alpine" for hostname, "dhcp" for eth0, "vda", 
+# "sys" and "y" for disk drive, enable "openssh", use "1" mirror for apk, reboot. Or with the answer file:
+
+setup-alpine -c answers
+sed -i -e 's/alpine-test/alpine/g' answers
+sed -i -e '/^PROXYOPTS/cPROXYOPTS="none"' answers
+sed -i -e '/^APKREPOSOPTS/s/-r/-1/' answers
+sed -i -e '/hostname/d' answers
+sed -i -e 's/openntpd/chrony/' answers
+sed -i -e '/^DISKOPTS/cDISKOPTS="-m sys /dev/vda"' answers
+sed -i -e 's/^LBUOPTS/#LBUOPTS/' answers
+sed -i -e 's/^APKCACHEOPTS/#APKCACHEOPTS/' answers
+sed -i -e '/^DNSOPTS/cDSNOPTS="-m ${DOMAIN_NAME} 8.8.8.8"' answers
+setup-alpine -f answers
+reboot
+
+# Then:
+
+. /etc/os-release
+VERSION=`echo ${VERSION_ID}|cut -f1-2 -d"."`
+
+# Enable community apk repo
+sed -i -e "/\/v${VERSION}\/community$/s/^#//" /etc/apk/repositories
+
+# Upgrade All Packages in OneShot
+apk upgrade --update-cache --available
+
+# Install sudo, cloud-init and acpi
+apk add sudo cloud-init acpi
+
+# Add cloud-init to startup
+rc-update add cloud-init
+
+# Create Initial User
+adduser -D alpine -G wheel
+
+# Unlock alpine user
+sed -i -e '/^alpine/s/!/*/' /etc/shadow
+
+# Add alpine user to sudoers
+sed -i -e '/^root ALL=(ALL) ALL/a\\alpine ALL=(ALL) ALL' /etc/sudoers
+
+# Update MOTD
+cat << EOF > /etc/motd
+Welcome to $PRETTY_NAME ($VERSION_ID)!
+Home URL: $HOME_URL
+EOF
+
+# Poweroff
+poweroff
+
+# Upload the alpine openstack image to glance
+openstack image create --public --file alpine-virt-3.13.5-x86_64.img --property hw_scsi_model=virtio-scsi --property hw_disk_bus=scsi --property hw_qemu_guest_agent=yes --property os_require_quiesce=yes alpine-virt-3.13.5-x86_64

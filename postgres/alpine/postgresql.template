@@ -1,0 +1,47 @@
+#!/sbin/openrc-run
+
+extra_commands="start stop status reload restart initdb cluster_status"
+
+depend() {
+  need net
+}
+
+start() {
+  ebegin "Starting ${RC_SVCNAME}"
+  su -l postgres -s /bin/sh -c "pg_ctl start -D /var/lib/postgresql/13/data"
+  eend $? ""
+}
+
+stop() {
+  ebegin "Stopping ${RC_SVCNAME}"
+  su -l postgres -s /bin/sh -c "pg_ctl stop -D /var/lib/postgresql/13/data -m fast"
+  eend $? ""
+}
+
+status() {
+  su -l postgres -s /bin/sh -c "pg_ctl status -D /var/lib/postgresql/13/data"
+}
+
+initdb() {
+  ebegin "Creating database for ${RC_SVCNAME}"
+  su -l postgres -s /bin/sh -c "pg_ctl initdb -D /var/lib/postgresql/13/data"
+  eend $? ""
+}
+
+reload() {
+  ebegin "Reloading ${RC_SVCNAME}"
+  su -l postgres -s /bin/sh -c "pg_ctl reload -D /var/lib/postgresql/13/data"
+  eend $? ""
+}
+
+restart() {
+  ebegin "Restarting ${RC_SVCNAME}"
+  su -l postgres -s /bin/sh -c "pg_ctl restart -D /var/lib/postgresql/13/data -m fast"
+  eend $? ""
+}
+
+cluster_status() {
+  ebegin "t means slave, f - master"
+  su -l postgres -s /bin/sh -c "psql -h 0.0.0.0 -d postgres -U postgres -c 'select pg_is_in_recovery();'"
+  eend $? ""
+}

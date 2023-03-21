@@ -1,0 +1,22 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="Placement resource openstack service"
+command="/bin/placement-api"
+command_args="--host 0.0.0.0 --port ${PORT}"
+command_user="placement:placement"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+#supervise_daemon_args="--stdout /var/log/placement/placement-${i}.out --stderr /var/log/placement/placement-${i}.err"
+directory=/var/lib/placement
+required_files=/etc/placement/placement.conf
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+#output_logger="/usr/bin/logger"
+#error_logger="/usr/bin/logger"
+
+depend() {
+  need net
+}

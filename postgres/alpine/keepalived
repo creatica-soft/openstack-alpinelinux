@@ -1,0 +1,42 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="Keepalived service"
+command="/usr/sbin/keepalived"
+command_args="--dont-fork --use-file=/etc/keepalived/keepalived.conf --log-console"
+command_user="root:root"
+extra_commands="stats reload test_config"
+description_test_config="Check configuration file for errors"
+description_reload="Close down all interfaces, reload its configuration, and start up with new configuration"
+description_stats="Print statistics info"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+output_logger="/usr/bin/logger -p daemon.info -t keepalived"
+error_logger="/usr/bin/logger -p daemon.info -t keepalived"
+
+depend() {
+  need net
+}
+
+stats() {
+  ebegin "Getting stats for ${RC_SVCNAME}"
+  supervise-daemon ${RC_SVCNAME} --signal USR2
+  cat /tmp/keepalived.stats
+  eend $? ""
+}
+
+reload() {
+  ebegin "Reloading ${RC_SVCNAME}"
+  supervise-daemon ${RC_SVCNAME} --signal HUP
+  eend $? ""
+}
+
+test_config() {
+  ebegin "Verifying config file /etc/keepalived/keepalived.conf for ${RC_SVCNAME}"
+  supervise-daemon ${RC_SVCNAME} -- --config-test=/etc/keepalived/keepalived.conf
+  eend $? ""
+}

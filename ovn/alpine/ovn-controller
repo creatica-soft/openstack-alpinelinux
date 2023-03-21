@@ -1,0 +1,24 @@
+#!/sbin/openrc-run
+
+name=${RC_SVCNAME}
+description="OVN controller daemon"
+command="/usr/bin/ovn-controller"
+command_args="unix:/var/run/openvswitch/db.sock -vconsole:off -vsyslog:info -vfile:off -vFACILITY:local0 --no-chdir"
+command_user="root:root"
+supervisor=supervise-daemon
+respawn_delay=5
+respawn_max=0
+#supervise_daemon_args="--stdout /var/log/ovn/ovn-controller.out --stderr /var/log/ovn/ovn-controller.err"
+umask=0027
+pidfile="/run/${RC_SVCNAME}.pid"
+command_background="yes"
+#output_logger="/usr/bin/logger"
+#error_logger="/usr/bin/logger"
+
+depend() {
+  need net ovsdb-server ovs-vswitchd
+}
+
+start_pre() {
+  mkdir -p /var/run/ovn
+}
